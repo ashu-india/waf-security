@@ -1,0 +1,58 @@
+{
+  "id": "threat-detector",
+  "name": "Threat Detector - RandomForest",
+  "version": 1,
+  "type": "RandomForest",
+  "algorithm": "RandomForestClassifier",
+  "metrics": {
+    "accuracy": 0.525,
+    "precision": 0,
+    "recall": 0,
+    "f1": 0,
+    "rocAuc": 0,
+    "confusionMatrix": {
+      "truePositives": 0,
+      "trueNegatives": 21,
+      "falsePositives": 0,
+      "falseNegatives": 19
+    },
+    "specificityTpr": 1,
+    "sensitivityFpr": 0
+  },
+  "featureImportance": {
+    "failedLoginAttempts": 0.000023956339138760537,
+    "requestsPerMinute": 0.0017972767237077374,
+    "distinctIps": 0.00001888122613876221,
+    "suspiciousPayload": 2.0795820555413746e-8,
+    "geoLocationAnomaly": 5.867777780114251e-8,
+    "timeBetweenRequests": 0.9981571104925023,
+    "userAgentChanges": 0.0000025715809303846916,
+    "botScore": 1.2416398361972122e-7
+  },
+  "weights": {
+    "failedLoginAttempts": 0.010865678356256632,
+    "requestsPerMinute": 0.08097807503791961,
+    "distinctIps": 0.0043757527336371095,
+    "suspiciousPayload": 0.000060674549855212606,
+    "geoLocationAnomaly": 0.00020118403373044143,
+    "timeBetweenRequests": -0.9006549521222738,
+    "userAgentChanges": 0.002284875811652872,
+    "botScore": 0.0005788073546742425
+  },
+  "parameters": {
+    "nEstimators": 100,
+    "maxDepth": 10,
+    "minSamplesSplit": 5,
+    "minSamplesLeaf": 2,
+    "maxFeatures": "sqrt",
+    "randomState": 42,
+    "threshold": 0.5
+  },
+  "trainingData": {
+    "samplesCount": 200,
+    "featuresCount": 8,
+    "trainDate": "2025-12-01T11:41:17.693Z",
+    "trainingTime": 6
+  },
+  "savedAt": "2025-12-01T11:41:17.694Z"
+}

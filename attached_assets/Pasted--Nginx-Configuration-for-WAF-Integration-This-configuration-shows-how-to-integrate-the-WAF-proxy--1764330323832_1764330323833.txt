@@ -1,0 +1,199 @@
+# Nginx Configuration for WAF Integration
+# This configuration shows how to integrate the WAF proxy with your web application
+# 
+# Place this in your nginx configuration (e.g., /etc/nginx/sites-available/default)
+# Then run: sudo systemctl reload nginx
+#
+# WAF Admin Dashboard runs at: http://localhost:5000
+# Demo App runs at: http://localhost:3001
+# With WAF Proxy: http://localhost:8080 (protected)
+
+# Upstream servers configuration
+upstream waf_admin {
+    server 10.23.2.11:5000;
+    keepalive 32;
+}
+
+upstream demo_app {
+    server 10.1.40.99:5000;
+    keepalive 32;
+}
+
+upstream waf_proxy {
+    server 10.23.2.11:9000;  # WAF reverse proxy port
+    keepalive 32;
+}
+
+# HTTP redirect to HTTPS (in production)
+server {
+    listen 80;
+    server_name _;
+    
+    # WAF Admin Dashboard
+    location /waf/ {
+        proxy_pass http://waf_admin/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+    }
+    
+    # WebSocket for real-time traffic updates (CRITICAL FOR REAL-TIME DATA)
+    location /ws/traffic {
+        proxy_pass http://waf_admin/ws/traffic;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;           # ✅ REQUIRED
+        proxy_set_header Connection "upgrade";            # ✅ REQUIRED
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+    }
+    
+    
+    # Demo app through WAF proxy (protected)
+    location / {
+        # Forward through WAF proxy
+        proxy_pass http://waf_proxy;
+        proxy_http_version 1.1;
+        
+        # Important headers for WAF analysis
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header X-Original-URL $scheme://$server_name$request_uri;
+        
+        # Connection settings
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        
+        # WebSocket support
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+    
+    # Direct access to demo app (for testing without WAF)
+    location /direct/ {
+        rewrite ^/direct/(.*) /$1 break;
+        proxy_pass http://demo_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+    }
+    
+    # API endpoints
+    location /api/ {
+        # Forward through WAF proxy for protection
+        proxy_pass http://waf_proxy;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header Connection "";
+    }
+    
+    # Health check
+    location /health {
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}
+
+# HTTPS configuration (optional - for production with SSL certificates)
+#
+# To enable HTTPS:
+# 1. Generate or obtain SSL certificates (e.g., with Let's Encrypt)
+# 2. Update the paths below to your certificate locations
+# 3. Uncomment this server block
+# 4. Reload Nginx: sudo systemctl reload nginx
+#
+# Example with Let's Encrypt:
+#   sudo certbot certonly --standalone -d your-domain.com
+#   Then update paths below to /etc/letsencrypt/live/your-domain.com/
+#
+# server {
+#     listen 443 ssl http2;
+#     server_name your-domain.com;
+#     
+#     # SSL certificates - UPDATE THESE PATHS
+#     ssl_certificate /etc/nginx/ssl/your-domain.com.crt;
+#     ssl_certificate_key /etc/nginx/ssl/your-domain.com.key;
+#     
+#     # SSL configuration
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#     ssl_session_cache shared:SSL:10m;
+#     ssl_session_timeout 10m;
+#     
+#     # Security headers
+#     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+#     add_header X-Frame-Options "SAMEORIGIN" always;
+#     add_header X-Content-Type-Options "nosniff" always;
+#     add_header X-XSS-Protection "1; mode=block" always;
+#     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+#     
+#     # WAF Admin Dashboard
+#     location /waf/ {
+#         proxy_pass http://waf_admin/;
+#         proxy_http_version 1.1;
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_set_header Connection "";
+#     }
+#     
+#     # WebSocket support for real-time monitoring
+#     location /waf/ws/ {
+#         proxy_pass http://waf_admin/ws/;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_read_timeout 86400;
+#     }
+#     
+#     # Protected application through WAF
+#     location / {
+#         proxy_pass http://waf_proxy;
+#         proxy_http_version 1.1;
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_set_header X-Original-URI $request_uri;
+#         proxy_set_header X-Original-URL $scheme://$server_name$request_uri;
+#         proxy_set_header Connection "";
+#         proxy_buffering off;
+#         
+#         # WebSocket support
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#         
+#         # Timeouts
+#         proxy_connect_timeout 60s;
+#         proxy_send_timeout 60s;
+#         proxy_read_timeout 60s;
+#     }
+# }
